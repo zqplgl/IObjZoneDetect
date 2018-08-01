@@ -25,6 +25,10 @@ include_directories(./include)
 find_library(darknet_lib darknet /home/zqp/mygithub/darknet)
 
 find_package(OpenCV)
-add_library(IObjZoneDetect SHARED ${src})
+add_library(IObjZoneDetect SHARED ${src} testIObjZoneDetect.cpp)
 target_link_libraries(IObjZoneDetect ${darknet_lib} ${OpenCV_LIBS})
+
+
+add_executable(testIObjZoneDetect testIObjZoneDetect.cpp)
+target_link_libraries(testIObjZoneDetect IObjZoneDetect)
 
