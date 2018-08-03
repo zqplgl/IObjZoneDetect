@@ -4,25 +4,24 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 set(CMAKE_CXX_FLAGS "-std=c++11")
 file(GLOB src src/*.cpp)
 
-option(GPU "set gpu mode" OFF)
-option(CUDNN "use cudnn" OFF)
+option(GPU "set gpu mode" ON)
+option(CUDNN "use cudnn" ON)
 if(GPU)
     add_definitions(-DGPU)
+    include_directories(/usr/local/cuda/include)
     message(STATUS "use cuda")
 endif()
 
 
 if(CUDNN)
     add_definitions(-DCUDNN)
-    set(CUDNN_DIR /home/zqp/install_lib/cudnn/cudnn_v6/cuda/include)
-    include_directories(${CUDNN_DIR})
     message(STATUS "use cudnn")
 endif()
 
-include_directories(/home/zqp/mygithub/IObjZoneDetectYoloV3/include)
+include_directories(/home/zqp/install_lib/include)
 include_directories(./include)
 
-find_library(darknet_lib darknet /home/zqp/mygithub/darknet)
+find_library(darknet_lib darknet /home/zqp/install_lib/lib)
 
 find_package(OpenCV)
 add_library(IObjZoneDetect SHARED ${src} testIObjZoneDetect.cpp)

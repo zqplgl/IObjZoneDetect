@@ -121,13 +121,18 @@ namespace ObjZoneDetect
 
             box &b = dets[i].bbox;
             Object obj;
+            if(index==0)
+                obj.cls = 0;
+            else if(index==2 || index==5 || index==6 || index==7)
+                obj.cls = 1;
+            else
+                continue;
             obj.zone.x = (b.x-b.w/2.)*im.w;
             obj.zone.y = (b.y-b.h/2.)*im.h;
             obj.zone.width = (b.x+b.w/2.)*im.w - obj.zone.x;
             obj.zone.height = (b.y+b.h/2.)*im.h - obj.zone.y;
 
             obj.score = score;
-            obj.cls = index;
 
             objs.push_back(obj);
 
