@@ -7,6 +7,7 @@
 #include<iostream>
 #include <time.h>
 #include "IObjZoneDetect.h"
+#include <stdio.h>
 
 using namespace std;
 using namespace cv;
@@ -42,14 +43,12 @@ void getImPath(string& picDir,vector<string>&imPath)
     }
 }
 
-
-int main(int argc , char** argv)
+void run_pic()
 {
-
 	string cfg_file ="/home/zqp/install_lib/models/yolov3/yolov3.cfg";
     string weights_file = "/home/zqp/install_lib/models/yolov3/yolov3.weights";
 
-    string picDir = "/home/zqp/mygithub/darknet/data/";
+    string picDir = "/home/zqp/github/darknet/data/";
 
     int gpu_id = 0;
     IObjZoneDetect *detector = CreateObjZoneYoloV3Detector(cfg_file,weights_file,gpu_id);
@@ -65,13 +64,13 @@ int main(int argc , char** argv)
 
     int index = 0;
     if(!imPath.size())
-        return 0;
+        return ;
 
     while(1)
     {
 
         if(index>=imPath.size())
-            index = 0;
+            break;
 
         cout<<imPath[index]<<endl;
         file = imPath[index];
@@ -91,5 +90,40 @@ int main(int argc , char** argv)
         imshow("im",im);
         waitKey(0);
   }
-    //DestroyObjZoneFasterDetector(detector);
+}
+
+void run_video()
+{
+	string cfg_file ="/home/zqp/install_lib/models/yolov3/yolov3.cfg";
+    string weights_file = "/home/zqp/install_lib/models/yolov3/yolov3.weights";
+
+    string picDir = "/home/zqp/github/darknet/data/";
+
+    int gpu_id = 0;
+    IObjZoneDetect *detector = CreateObjZoneYoloV3Detector(cfg_file,weights_file,gpu_id);
+
+    string videopath = "/home/zqp/video/test.mp4";
+    VideoCapture cap(videopath);
+    vector<Object> objs;
+
+    clock_t start,end;
+
+    Mat im;
+    while(cap.read(im))
+    {
+        start = clock();
+        detector->Detect(im,objs,0.5);
+        end = clock();
+        cout<<"**********detect cost time: "<<(double(end-start)/CLOCKS_PER_SEC)*1000<<" ms"<<endl;
+        cout<<"objs: "<<objs.size()<<endl;
+        addRectangle(im,objs);
+        imshow("im",im);
+        waitKey(1);
+  }
+}
+
+
+int main(int argc , char** argv)
+{
+    run_video();
 }

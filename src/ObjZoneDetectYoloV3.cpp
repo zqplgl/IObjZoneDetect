@@ -1,7 +1,7 @@
 #include<iomanip>
 #include <iosfwd>
 #include<iostream>
-//#include<opencv2/opencv.hpp>
+#include<opencv2/imgproc/imgproc.hpp>
 #include <time.h>
 #include <fstream>
 #include <string>
@@ -99,7 +99,9 @@ namespace ObjZoneDetect
     }
     void YoloV3Detector::Detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold)
     {
-        image im = ipl_into_image(img);
+        Mat im_resize;
+        cv::resize(img,im_resize,Size(net->w,net->h));
+        image im = ipl_into_image(im_resize);
         image sized = letterbox_image(im,net->w,net->h);
         layer l = net->layers[net->n-1];
         network_predict(net,sized.data);
@@ -127,10 +129,10 @@ namespace ObjZoneDetect
                 obj.cls = 1;
             else
                 continue;
-            obj.zone.x = (b.x-b.w/2.)*im.w;
-            obj.zone.y = (b.y-b.h/2.)*im.h;
-            obj.zone.width = (b.x+b.w/2.)*im.w - obj.zone.x;
-            obj.zone.height = (b.y+b.h/2.)*im.h - obj.zone.y;
+            obj.zone.x = (b.x-b.w/2.)*img.cols;
+            obj.zone.y = (b.y-b.h/2.)*img.rows;
+            obj.zone.width = (b.x+b.w/2.)*img.cols - obj.zone.x;
+            obj.zone.height = (b.y+b.h/2.)*img.rows - obj.zone.y;
 
             obj.score = score;
 
