@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
-#set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS "-std=c++11")
 file(GLOB src src/*.cpp)
 
 option(CPU_ONLY "set cpu mode" OFF)
