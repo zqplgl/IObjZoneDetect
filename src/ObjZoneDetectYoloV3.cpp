@@ -11,16 +11,18 @@
 
 #include "IObjZoneDetect.h"
 
-#ifdef GPU
+#ifndef CPU_ONLY
+    #define GPU
     #define BLOCK 512
 
     #include "cuda_runtime.h"
     #include "curand.h"
     #include "cublas_v2.h"
+#endif
 
-    #ifdef CUDNN
+#ifdef USE_CUDNN
+    #define CUDNN
     #include "cudnn.h"
-    #endif
 #endif
 
 extern "C"
