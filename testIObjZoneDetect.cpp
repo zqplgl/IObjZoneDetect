@@ -73,7 +73,7 @@ IObjZoneDetect* create_yolov3_detector()
 
 void run_pic()
 {
-    string picDir = "/home/zqp/github/darknet/data/";
+    string picDir = "/home/zqp/github/mtcnn-master/";
 
     //IObjZoneDetect *detector = create_yolov3_detector();
     IObjZoneDetect *detector = create_mtcnn_detector();
