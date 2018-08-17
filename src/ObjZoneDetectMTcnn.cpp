@@ -19,12 +19,17 @@ namespace ObjZoneDetect
         cv::Mat imConvert(const cv::Mat& im);
         void imResize(const cv::Mat&im,vector<Mat>& ims,vector<float>& scales);
         void pNet(const vector<Mat>& ims,const vector<float>& scales,vector<vector<float> >& total_boxes);
+        void rNet(const vector<Mat>& ims,vector<vector<float> >& total_boxes);
+        void oNet(const vector<Mat>& ims,vector<vector<float> >& total_boxes);
         void wrapInputLayer(const Mat &im,const int i);
         void generateBoundingBox(const Blob<float>* prob,const Blob<float>* reg, const float scale, const float threshold,vector<vector<float> >& boxes);
         void nms(vector<vector<float> >& bboxes,const float threshold);
         float calcDistIOU(const vector<float>& bbox1, const vector<float>& bbox2);
         void rerac(vector<vector<float> > &boxes);
         void pad(vector<vector<float> > & boxes,const cv::Mat &im,vector<vector<float> >&dst_boxes);
+        void wrapInputLayer(const vector<Mat> &ims,const int i);
+        void generateRois(const Mat &im, const vector<vector<float> >&boxes,const vector<vector<float> >&dst_boxes,vector<Mat>& ims);
+        void bbreg(vector<vector<float> >& boxes,const Blob<float>* prob, const Blob<float>* reg,const float threshold);
 
         void addRectangle(cv::Mat &im,const vector<vector<float> >& bboxes);
 
@@ -157,6 +162,39 @@ namespace ObjZoneDetect
 
         cv::split(im.t(),input_channels);
         assert(reinterpret_cast<float*>(input_channels.at(0).data)==nets_[i]->input_blobs()[0]->cpu_data());
+    }
+
+    void MTcnnDetector::wrapInputLayer(const vector<cv::Mat> &ims, const int i)
+    {
+        vector<Mat> input_channels;
+        input_channels.clear();
+        Blob<float>* input_layer = nets_[i]->input_blobs()[0];
+        assert(input_layer->channels()==num_channels_);
+
+        int width = input_layer->width();
+        int height = input_layer->height();
+        input_layer->Reshape(ims.size(),num_channels_,height,width);
+        nets_[i]->Reshape();
+
+        float* input_data = input_layer->mutable_cpu_data();
+
+        int size = width * height;
+
+        for(int i=0; i<ims.size(); ++i)
+        {
+            Mat im;
+            cv::resize(ims[i],im,Size(height,width));
+            im.convertTo(im,CV_32FC3,0.0078125,-127.5*0.0078125);
+            input_channels.clear();
+            for (int i = 0; i < input_layer->channels(); ++i)
+            {
+                cv::Mat channel(height, width, CV_32FC1, input_data);
+                input_channels.push_back(channel);
+                input_data += size;
+            }
+
+            split(im.t(),input_channels);
+        }
     }
 
     void MTcnnDetector::imResize(const cv::Mat &im, vector<cv::Mat> &ims,vector<float>& scales)
@@ -380,7 +418,7 @@ namespace ObjZoneDetect
             if(boxes[i][3]>=im.rows)
             {
                 dst_box.push_back(side - (boxes[i][3] - (im.rows - 1)));
-                boxes[i][2] = im.rows - 1;
+                boxes[i][3] = im.rows - 1;
             }
             else
             {
@@ -393,21 +431,117 @@ namespace ObjZoneDetect
 
     }
 
+    void MTcnnDetector::generateRois(const Mat &im,const vector<vector<float> > &boxes, const vector<vector<float> > &dst_boxes, vector<cv::Mat> &ims)
+    {
+        assert(boxes.size()==dst_boxes.size());
+        ims.clear();
+
+        for(int i=0; i<dst_boxes.size(); ++i)
+        {
+            Mat im_roi;
+            if(num_channels_==3)
+                im_roi = Mat(dst_boxes[i][4],dst_boxes[i][4],CV_32FC3,Scalar(0,0,0));
+            else
+                im_roi = Mat(dst_boxes[i][4],dst_boxes[i][4],CV_32FC1,Scalar(0));
+
+            im(Range(boxes[i][1],boxes[i][3]),Range(boxes[i][0],boxes[i][2])). \
+                copyTo(im_roi(Range(dst_boxes[i][1],dst_boxes[i][3]),Range(dst_boxes[i][0],dst_boxes[i][2])));
+
+            ims.push_back(im_roi);
+        }
+    }
+
+    void MTcnnDetector::bbreg(vector<vector<float> > &boxes, const caffe::Blob<float> *prob, const caffe::Blob<float> *reg, const float threshold)
+    {
+        assert(prob->num()==boxes.size());
+        const float *scores = prob->cpu_data();
+        const float *boxreg = reg->cpu_data();
+        int offset = 0;
+
+        for(int i=0; i<prob->num(); ++i)
+        {
+            if(scores[i<<1+1]<threshold)
+            {
+                boxes.erase(boxes.begin()+offset);
+                continue;
+            }
+
+            int w = boxes[offset][2] - boxes[offset][0];
+            int h = boxes[offset][3] - boxes[offset][1];
+            //float dx1 = boxreg[i<<2+1];
+            //float dy1 = boxreg[i<<2];
+            //float dx2 = boxreg[i<<2+3];
+            //float dy2 = boxreg[i<<2+2];
+            float dx1 = boxreg[i<<2];
+            float dy1 = boxreg[i<<2+1];
+            float dx2 = boxreg[i<<2+2];
+            float dy2 = boxreg[i<<2+3];
+
+            boxes[offset][0] = int(boxes[offset][0] + dx1*w);
+            boxes[offset][1] = int(boxes[offset][1] + dy1*h);
+            boxes[offset][2] = int(boxes[offset][2] + dx2*w);
+            boxes[offset][3] = int(boxes[offset][3] + dy2*h);
+            boxes[offset][4] = scores[i<<1+1];
+            offset++;
+        }
+    }
+
+    void MTcnnDetector::rNet(const vector<cv::Mat> &ims, vector<vector<float> > &boxes)
+    {
+        wrapInputLayer(ims,1);
+        std::shared_ptr<Net<float> > rnet = nets_[1];
+        pair<string,string> out_blobname = out_blobnames_[1];
+
+        rnet->Forward();
+        Blob<float>* prob = rnet->blob_by_name(out_blobname.first).get();
+        Blob<float>* reg = rnet->blob_by_name(out_blobname.second).get();
+
+        bbreg(boxes,prob,reg,thresholds_[1]);
+        nms(boxes,outer_nms_);
+
+        cout<<prob->num()<<"\t"<<prob->channels()<<"\t"<<prob->height()<<"\t"<<prob->width()<<endl;
+        cout<<reg->num()<<"\t"<<reg->channels()<<"\t"<<reg->height()<<"\t"<<reg->width()<<endl;
+    }
+    void MTcnnDetector::oNet(const vector<cv::Mat> &ims, vector<vector<float> > &boxes)
+    {
+        wrapInputLayer(ims,2);
+        std::shared_ptr<Net<float> > onet = nets_[2];
+        pair<string,string> out_blobname = out_blobnames_[2];
+
+        onet->Forward();
+        Blob<float>* prob = onet->blob_by_name(out_blobname.first).get();
+        Blob<float>* reg = onet->blob_by_name(out_blobname.second).get();
+
+        bbreg(boxes,prob,reg,thresholds_[2]);
+        nms(boxes,outer_nms_);
+
+        cout<<prob->num()<<"\t"<<prob->channels()<<"\t"<<prob->height()<<"\t"<<prob->width()<<endl;
+        cout<<reg->num()<<"\t"<<reg->channels()<<"\t"<<reg->height()<<"\t"<<reg->width()<<endl;
+    }
+
+
     void MTcnnDetector::Detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
     {
         cv::Mat im_float = imConvert(im);
 
         vector<Mat> ims;
         vector<float> scales;
+        vector<vector<float> >dst_boxes;
+        vector<Mat> im_rois;
+
         imResize(im_float,ims,scales);
         vector<vector<float> > boxes;
-
         pNet(ims,scales,boxes);
 
         rerac(boxes);
-        vector<vector<float> >dst_boxes;
         pad(boxes,im,dst_boxes);
+        generateRois(im_float,boxes,dst_boxes,im_rois);
+        rNet(im_rois,boxes);
 
+        rerac(boxes);
+        pad(boxes,im,dst_boxes);
+        generateRois(im_float,boxes,dst_boxes,im_rois);
+        oNet(im_rois,boxes);
         Mat im_temp = im.clone();
 
         addRectangle(im_temp,boxes);
