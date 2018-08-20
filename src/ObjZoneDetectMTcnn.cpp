@@ -30,6 +30,8 @@ namespace ObjZoneDetect
         void wrapInputLayer(const vector<Mat> &ims,const int i);
         void generateRois(const Mat &im, const vector<vector<float> >&boxes,const vector<vector<float> >&dst_boxes,vector<Mat>& ims);
         void bbreg(vector<vector<float> >& boxes,const Blob<float>* prob, const Blob<float>* reg,const float threshold);
+        float fix(float a);
+        void bbreg(vector<vector<float> >& boxes);
 
         void addRectangle(cv::Mat &im,const vector<vector<float> >& bboxes);
 
@@ -68,9 +70,9 @@ namespace ObjZoneDetect
         const float *data = blob->cpu_data();
         for(int i=0; i<blob->count(); ++i)
         {
-            if(i%10==0)
+            if(i%5==0)
                 out<<endl;
-            out<<float(data[i])<<"\t";
+            out<<data[i]<<"\t";
         }
 
     }
@@ -110,6 +112,17 @@ namespace ObjZoneDetect
         out_blobnames_.push_back(make_pair<string,string>("prob1","conv4-2"));
         out_blobnames_.push_back(make_pair<string,string>("prob1","conv5-2"));
         out_blobnames_.push_back(make_pair<string,string>("prob1","conv6-2"));
+    }
+
+    float MTcnnDetector::fix(float a)
+    {
+        float temp = a;
+        a = abs(a);
+        float result = round(a);
+        if(a>0 && (result - a)>5e-5)
+            result--;
+
+        return temp>0 ? result: -result;
     }
 
     cv::Mat MTcnnDetector::imConvert(const cv::Mat &im)
@@ -201,7 +214,7 @@ namespace ObjZoneDetect
     {
         ims.clear();
         scales.clear();
-        float scale = 12./min_size_;
+        float scale = 12.f/min_size_;
         int minl = min(im.rows,im.cols)*scale;
 
         while(minl>=12)
@@ -248,7 +261,7 @@ namespace ObjZoneDetect
         float iou = 0;
 
         if(area>0)
-            iou = area/(((bbox1[2]-bbox1[0])*(bbox1[3]-bbox1[1]))+((bbox2[2]-bbox2[0])*(bbox2[3]-bbox2[1]))-area);
+            iou = area/(((bbox1[2]-bbox1[0]+1)*(bbox1[3]-bbox1[1]+1))+((bbox2[2]-bbox2[0]+1)*(bbox2[3]-bbox2[1]+1))-area);
 
         return iou;
 
@@ -282,7 +295,7 @@ namespace ObjZoneDetect
     }
 
     void MTcnnDetector::generateBoundingBox(const caffe::Blob<float> *prob, const caffe::Blob<float> *reg,
-            const float scale, const float threshold,vector<vector<float> >& boxes)
+                                            const float scale, const float threshold,vector<vector<float> >& boxes)
     {
         int stride = 2;
         int cellsize = 12;
@@ -299,33 +312,31 @@ namespace ObjZoneDetect
         const float* dx2 = dy1 + size;
         const float* dy2 = dx2 + size;
 
-        for(int h=0; h<prob_h; ++h)
+        for(int w=0; w<prob_w; ++w)
         {
-            int line = h*prob_w;
-            for(int w=0; w<prob_w; ++w)
+            for(int h=0; h<prob_h; ++h)
             {
-                if(scores[line+w]<threshold)
+                int index = h*prob_w + w;
+                if(scores[index]<threshold)
                     continue;
 
                 vector<float> bbox;
-                float x1 = int((w*stride+1)/scale);
-                float y1 = int((h*stride+1)/scale);
-                float x2 = int((w*stride+cellsize)/scale);
-                float y2 = int((h*stride+cellsize)/scale);
-                float score = scores[line+w];
+                float y1 = (w*stride+1)/scale;
+                float x1 = (h*stride+1)/scale;
+                float y2 = (w*stride+cellsize)/scale;
+                float x2 = (h*stride+cellsize)/scale;
+                x2 = fix(x2);
+                float score = scores[index];
 
-                float box_w = x2 - x1;
-                float box_h = y2 - y1;
-                x1 = x1 + dx1[line+w]*box_w;
-                y1 = y1 + dy1[line+w]*box_h;
-                x2 = x2 + dx2[line+w]*box_w;
-                y2 = y2 + dy2[line+w]*box_h;
-
-                bbox.push_back(int(y1));
-                bbox.push_back(int(x1));
-                bbox.push_back(int(y2));
-                bbox.push_back(int(x2));
+                bbox.push_back(fix(x1));
+                bbox.push_back(fix(y1));
+                bbox.push_back(fix(x2));
+                bbox.push_back(fix(y2));
                 bbox.push_back(score);
+                bbox.push_back(dx1[index]);
+                bbox.push_back(dy1[index]);
+                bbox.push_back(dx2[index]);
+                bbox.push_back(dy2[index]);
 
                 boxes.push_back(bbox);
             }
@@ -347,6 +358,7 @@ namespace ObjZoneDetect
 
             Blob<float>* prob = pnet->blob_by_name(out_blobname.first).get();
             Blob<float>* reg = pnet->blob_by_name(out_blobname.second).get();
+            printBlob(reg);
             vector<vector<float> > boxes;
             generateBoundingBox(prob, reg,scales[i],thresholds_[0],boxes);
 
@@ -354,15 +366,15 @@ namespace ObjZoneDetect
                 total_boxes.push_back(boxes[j]);
         }
         nms(total_boxes,outer_nms_);
-
     }
 
     void MTcnnDetector::rerac(vector<vector<float> > &boxes)
     {
         for(int i=0; i<boxes.size(); ++i)
         {
-            int w = boxes[i][2] - boxes[i][0];
-            int h = boxes[i][3] - boxes[i][1];
+            float w = boxes[i][2] - boxes[i][0];
+            float h = boxes[i][3] - boxes[i][1];
+
             if(w==h)
                 continue;
             else if(w>h)
@@ -375,6 +387,9 @@ namespace ObjZoneDetect
                 boxes[i][0] -= (h-w)/2;
                 boxes[i][2] = boxes[i][0] + h;
             }
+            for(int j=0; j<4; ++j)
+                boxes[i][j] = fix(boxes[i][j]);
+
         }
     }
 
@@ -385,7 +400,8 @@ namespace ObjZoneDetect
         {
             //x1,y1,x2,y2,side
             vector<float> dst_box;
-            int side = boxes[i][2] - boxes[i][0];
+            float tempw = boxes[i][2] - boxes[i][0] + 1;
+            float temph = boxes[i][2] - boxes[i][0] + 1;
 
             if(boxes[i][0]<0)
             {
@@ -408,23 +424,24 @@ namespace ObjZoneDetect
 
             if(boxes[i][2]>=im.cols)
             {
-                dst_box.push_back(side - (boxes[i][2] - (im.cols - 1)));
+                dst_box.push_back(tempw - (boxes[i][2] - (im.cols - 1)));
                 boxes[i][2] = im.cols - 1;
             }
             else
             {
-                dst_box.push_back(side);
+                dst_box.push_back(tempw);
             }
             if(boxes[i][3]>=im.rows)
             {
-                dst_box.push_back(side - (boxes[i][3] - (im.rows - 1)));
+                dst_box.push_back(temph - (boxes[i][3] - (im.rows - 1)));
                 boxes[i][3] = im.rows - 1;
             }
             else
             {
-                dst_box.push_back(side);
+                dst_box.push_back(temph);
             }
-            dst_box.push_back(side);
+            dst_box.push_back(tempw);
+            dst_box.push_back(temph);
 
             dst_boxes.push_back(dst_box);
         }
@@ -448,6 +465,24 @@ namespace ObjZoneDetect
                 copyTo(im_roi(Range(dst_boxes[i][1],dst_boxes[i][3]),Range(dst_boxes[i][0],dst_boxes[i][2])));
 
             ims.push_back(im_roi);
+        }
+    }
+
+    void MTcnnDetector::bbreg(vector<vector<float> > &boxes)
+    {
+        for(int i=0; i<boxes.size(); ++i)
+        {
+            float w = boxes[i][2] - boxes[i][0];
+            float h = boxes[i][3] - boxes[i][1];
+            boxes[i][0] += w*boxes[i][5];
+            boxes[i][1] += h*boxes[i][6];
+            boxes[i][2] += w*boxes[i][7];
+            boxes[i][3] += h*boxes[i][8];
+            for(int j=5; j<boxes[i].size(); ++j)
+            {
+                boxes[i].erase(boxes[i].begin()+j);
+                j--;
+            }
         }
     }
 
@@ -502,6 +537,7 @@ namespace ObjZoneDetect
         cout<<prob->num()<<"\t"<<prob->channels()<<"\t"<<prob->height()<<"\t"<<prob->width()<<endl;
         cout<<reg->num()<<"\t"<<reg->channels()<<"\t"<<reg->height()<<"\t"<<reg->width()<<endl;
     }
+
     void MTcnnDetector::oNet(const vector<cv::Mat> &ims, vector<vector<float> > &boxes)
     {
         wrapInputLayer(ims,2);
@@ -519,7 +555,6 @@ namespace ObjZoneDetect
         cout<<reg->num()<<"\t"<<reg->channels()<<"\t"<<reg->height()<<"\t"<<reg->width()<<endl;
     }
 
-
     void MTcnnDetector::Detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
     {
         cv::Mat im_float = imConvert(im);
@@ -532,21 +567,23 @@ namespace ObjZoneDetect
         imResize(im_float,ims,scales);
         vector<vector<float> > boxes;
         pNet(ims,scales,boxes);
+        bbreg(boxes);
 
         rerac(boxes);
+        printBBox(boxes);
         pad(boxes,im,dst_boxes);
-        generateRois(im_float,boxes,dst_boxes,im_rois);
-        rNet(im_rois,boxes);
-
-        rerac(boxes);
-        pad(boxes,im,dst_boxes);
-        generateRois(im_float,boxes,dst_boxes,im_rois);
-        oNet(im_rois,boxes);
-        Mat im_temp = im.clone();
-
-        addRectangle(im_temp,boxes);
-        imshow("im",im_temp);
-        waitKey(0);
+//        generateRois(im_float,boxes,dst_boxes,im_rois);
+//        rNet(im_rois,boxes);
+//
+//        rerac(boxes);
+//        pad(boxes,im,dst_boxes);
+//        generateRois(im_float,boxes,dst_boxes,im_rois);
+//        oNet(im_rois,boxes);
+//        Mat im_temp = im.clone();
+//
+//        addRectangle(im_temp,boxes);
+//        imshow("im",im_temp);
+//        waitKey(0);
     }
 
     void MTcnnDetector::addRectangle(cv::Mat &im, const vector<vector<float> > &bboxes)
