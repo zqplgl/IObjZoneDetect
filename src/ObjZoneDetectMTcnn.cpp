@@ -88,6 +88,19 @@ namespace ObjZoneDetect
         }
     }
 
+    void printBBox(const vector<vector<float> >& bboxes1,const vector<vector<float> >& bboxes2)
+    {
+        ofstream out("save.txt");
+        for(int i=0; i<bboxes1.size(); ++i)
+        {
+            for(int j=0; j<bboxes1[i].size(); ++j)
+                out<<bboxes1[i][j]<<"\t";
+            for(int j=0; j<4; ++j)
+                out<<bboxes2[i][j]<<"\t";
+            out<<endl;
+        }
+    }
+
     MTcnnDetector::MTcnnDetector(const vector<string> &prototxt_files, const vector<string> &weights_file, const int gpu_id):gpu_id(gpu_id)
     {
 #ifndef CPU_ONLY
@@ -122,7 +135,7 @@ namespace ObjZoneDetect
         if(a>0 && (result - a)>5e-5)
             result--;
 
-        return temp>0 ? result: -result;
+        return temp>=0.f ? result: -result;
     }
 
     cv::Mat MTcnnDetector::imConvert(const cv::Mat &im)
@@ -401,44 +414,48 @@ namespace ObjZoneDetect
             //x1,y1,x2,y2,side
             vector<float> dst_box;
             float tempw = boxes[i][2] - boxes[i][0] + 1;
-            float temph = boxes[i][2] - boxes[i][0] + 1;
+            float temph = boxes[i][3] - boxes[i][1] + 1;
 
             if(boxes[i][0]<0)
             {
-                dst_box.push_back(-1*boxes[i][0]);
+                dst_box.push_back(fix(-1*boxes[i][0]));
                 boxes[i][0] = 0;
             }
             else
             {
                 dst_box.push_back(0);
+                boxes[i][0] = max(0.f,boxes[i][0] - 1);
             }
             if(boxes[i][1]<0)
             {
-                dst_box.push_back(-1*boxes[i][1]);
+                dst_box.push_back(fix(-1*boxes[i][1]));
                 boxes[i][1] = 0;
             }
             else
             {
                 dst_box.push_back(0);
+                boxes[i][1] = max(0.f,boxes[i][1] - 1);
             }
 
             if(boxes[i][2]>=im.cols)
             {
-                dst_box.push_back(tempw - (boxes[i][2] - (im.cols - 1)));
-                boxes[i][2] = im.cols - 1;
+                dst_box.push_back(tempw - (boxes[i][2] - (im.cols - 1)) - 1);
+                boxes[i][2] = im.cols - 2;
             }
             else
             {
-                dst_box.push_back(tempw);
+                dst_box.push_back(tempw - 1);
+                boxes[i][2] = max(0.f,boxes[i][2] - 1);
             }
             if(boxes[i][3]>=im.rows)
             {
-                dst_box.push_back(temph - (boxes[i][3] - (im.rows - 1)));
-                boxes[i][3] = im.rows - 1;
+                dst_box.push_back(temph - (boxes[i][3] - (im.rows - 1)) - 1);
+                boxes[i][3] = im.rows - 2;
             }
             else
             {
-                dst_box.push_back(temph);
+                dst_box.push_back(temph - 1);
+                boxes[i][3] = max(0.f,boxes[i][3] - 1);
             }
             dst_box.push_back(tempw);
             dst_box.push_back(temph);
@@ -572,6 +589,8 @@ namespace ObjZoneDetect
         rerac(boxes);
         printBBox(boxes);
         pad(boxes,im,dst_boxes);
+        printBBox(dst_boxes);
+        printBBox(dst_boxes,boxes);
 //        generateRois(im_float,boxes,dst_boxes,im_rois);
 //        rNet(im_rois,boxes);
 //
