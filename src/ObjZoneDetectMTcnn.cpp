@@ -60,7 +60,7 @@ namespace ObjZoneDetect
         {
             if(i%10==0)
                 out<<endl;
-            out<<float(data[i])<<"\t";
+            out<<data[i]<<"\t";
         }
     }
 
@@ -205,6 +205,8 @@ namespace ObjZoneDetect
         float* input_data = input_layer->mutable_cpu_data();
 
         int size = width * height;
+
+        printMat(ims[0]);
 
         for(int i=0; i<ims.size(); ++i)
         {
@@ -416,9 +418,9 @@ namespace ObjZoneDetect
             float tempw = boxes[i][2] - boxes[i][0] + 1;
             float temph = boxes[i][3] - boxes[i][1] + 1;
 
-            if(boxes[i][0]<0)
+            if(boxes[i][0]<1)
             {
-                dst_box.push_back(fix(-1*boxes[i][0]));
+                dst_box.push_back(1 - boxes[i][0]);
                 boxes[i][0] = 0;
             }
             else
@@ -426,9 +428,9 @@ namespace ObjZoneDetect
                 dst_box.push_back(0);
                 boxes[i][0] = max(0.f,boxes[i][0] - 1);
             }
-            if(boxes[i][1]<0)
+            if(boxes[i][1]<1)
             {
-                dst_box.push_back(fix(-1*boxes[i][1]));
+                dst_box.push_back(1 - boxes[i][1]);
                 boxes[i][1] = 0;
             }
             else
@@ -437,7 +439,7 @@ namespace ObjZoneDetect
                 boxes[i][1] = max(0.f,boxes[i][1] - 1);
             }
 
-            if(boxes[i][2]>=im.cols)
+            if(boxes[i][2]>=im.cols - 1)
             {
                 dst_box.push_back(tempw - (boxes[i][2] - (im.cols - 1)) - 1);
                 boxes[i][2] = im.cols - 2;
@@ -447,7 +449,7 @@ namespace ObjZoneDetect
                 dst_box.push_back(tempw - 1);
                 boxes[i][2] = max(0.f,boxes[i][2] - 1);
             }
-            if(boxes[i][3]>=im.rows)
+            if(boxes[i][3]>=im.rows - 1)
             {
                 dst_box.push_back(temph - (boxes[i][3] - (im.rows - 1)) - 1);
                 boxes[i][3] = im.rows - 2;
@@ -474,12 +476,12 @@ namespace ObjZoneDetect
         {
             Mat im_roi;
             if(num_channels_==3)
-                im_roi = Mat(dst_boxes[i][4],dst_boxes[i][4],CV_32FC3,Scalar(0,0,0));
+                im_roi = Mat(dst_boxes[i][5] + 1,dst_boxes[i][4] + 1,CV_32FC3,Scalar(0,0,0));
             else
-                im_roi = Mat(dst_boxes[i][4],dst_boxes[i][4],CV_32FC1,Scalar(0));
+                im_roi = Mat(dst_boxes[i][5],dst_boxes[i][4],CV_32FC1,Scalar(0));
 
-            im(Range(boxes[i][1],boxes[i][3]),Range(boxes[i][0],boxes[i][2])). \
-                copyTo(im_roi(Range(dst_boxes[i][1],dst_boxes[i][3]),Range(dst_boxes[i][0],dst_boxes[i][2])));
+            im(Range(boxes[i][1],boxes[i][3]+1),Range(boxes[i][0],boxes[i][2]+1)). \
+                copyTo(im_roi(Range(dst_boxes[i][1],dst_boxes[i][3]+1),Range(dst_boxes[i][0],dst_boxes[i][2]+1)));
 
             ims.push_back(im_roi);
         }
@@ -520,10 +522,6 @@ namespace ObjZoneDetect
 
             int w = boxes[offset][2] - boxes[offset][0];
             int h = boxes[offset][3] - boxes[offset][1];
-            //float dx1 = boxreg[i<<2+1];
-            //float dy1 = boxreg[i<<2];
-            //float dx2 = boxreg[i<<2+3];
-            //float dy2 = boxreg[i<<2+2];
             float dx1 = boxreg[i<<2];
             float dy1 = boxreg[i<<2+1];
             float dx2 = boxreg[i<<2+2];
@@ -547,12 +545,12 @@ namespace ObjZoneDetect
         rnet->Forward();
         Blob<float>* prob = rnet->blob_by_name(out_blobname.first).get();
         Blob<float>* reg = rnet->blob_by_name(out_blobname.second).get();
+        Blob<float>* data = rnet->blob_by_name("data").get();
 
-        bbreg(boxes,prob,reg,thresholds_[1]);
-        nms(boxes,outer_nms_);
+        printBlob(reg);
+//        bbreg(boxes,prob,reg,thresholds_[1]);
+//        nms(boxes,outer_nms_);
 
-        cout<<prob->num()<<"\t"<<prob->channels()<<"\t"<<prob->height()<<"\t"<<prob->width()<<endl;
-        cout<<reg->num()<<"\t"<<reg->channels()<<"\t"<<reg->height()<<"\t"<<reg->width()<<endl;
     }
 
     void MTcnnDetector::oNet(const vector<cv::Mat> &ims, vector<vector<float> > &boxes)
@@ -574,6 +572,7 @@ namespace ObjZoneDetect
 
     void MTcnnDetector::Detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
     {
+        cv::Mat im_temp = im.clone();
         cv::Mat im_float = imConvert(im);
 
         vector<Mat> ims;
@@ -587,19 +586,16 @@ namespace ObjZoneDetect
         bbreg(boxes);
 
         rerac(boxes);
-        printBBox(boxes);
         pad(boxes,im,dst_boxes);
-        printBBox(dst_boxes);
         printBBox(dst_boxes,boxes);
-//        generateRois(im_float,boxes,dst_boxes,im_rois);
-//        rNet(im_rois,boxes);
-//
+        generateRois(im_float,boxes,dst_boxes,im_rois);
+        rNet(im_rois,boxes);
+
 //        rerac(boxes);
 //        pad(boxes,im,dst_boxes);
 //        generateRois(im_float,boxes,dst_boxes,im_rois);
 //        oNet(im_rois,boxes);
-//        Mat im_temp = im.clone();
-//
+
 //        addRectangle(im_temp,boxes);
 //        imshow("im",im_temp);
 //        waitKey(0);
