@@ -511,28 +511,35 @@ namespace ObjZoneDetect
         const float *scores = prob->cpu_data();
         const float *boxreg = reg->cpu_data();
         int offset = 0;
+        int temp_index = 0;
 
         for(int i=0; i<prob->num(); ++i)
         {
-            if(scores[i<<1+1]<threshold)
+            if(scores[i*2+1]<=thresholds_[1])
             {
-                boxes.erase(boxes.begin()+offset);
+                boxes.erase(boxes.begin()+temp_index);
                 continue;
             }
+            boxes[temp_index][4] = scores[i*2+1];
+            for(int j=0; j<4; ++j)
+                boxes[temp_index].push_back(boxreg[i*4+j]);
+            temp_index ++;
+        }
+        nms(boxes,outer_nms_);
 
-            int w = boxes[offset][2] - boxes[offset][0];
-            int h = boxes[offset][3] - boxes[offset][1];
-            float dx1 = boxreg[i<<2];
-            float dy1 = boxreg[i<<2+1];
-            float dx2 = boxreg[i<<2+2];
-            float dy2 = boxreg[i<<2+3];
-
-            boxes[offset][0] = int(boxes[offset][0] + dx1*w);
-            boxes[offset][1] = int(boxes[offset][1] + dy1*h);
-            boxes[offset][2] = int(boxes[offset][2] + dx2*w);
-            boxes[offset][3] = int(boxes[offset][3] + dy2*h);
-            boxes[offset][4] = scores[i<<1+1];
-            offset++;
+        for(int i=0; i<boxes.size(); ++i)
+        {
+            float w = boxes[i][2] - boxes[i][0] + 1;
+            float h = boxes[i][3] - boxes[i][1] + 1;
+            boxes[i][0] += w*boxes[i][5];
+            boxes[i][1] += h*boxes[i][6];
+            boxes[i][2] += w*boxes[i][7];
+            boxes[i][3] += h*boxes[i][8];
+            for(int j=5; j<boxes[i].size(); ++j)
+            {
+                boxes[i].erase(boxes[i].begin()+j);
+                j--;
+            }
         }
     }
 
@@ -545,12 +552,8 @@ namespace ObjZoneDetect
         rnet->Forward();
         Blob<float>* prob = rnet->blob_by_name(out_blobname.first).get();
         Blob<float>* reg = rnet->blob_by_name(out_blobname.second).get();
-        Blob<float>* data = rnet->blob_by_name("data").get();
 
-        printBlob(reg);
-//        bbreg(boxes,prob,reg,thresholds_[1]);
-//        nms(boxes,outer_nms_);
-
+        bbreg(boxes,prob,reg,thresholds_[1]);
     }
 
     void MTcnnDetector::oNet(const vector<cv::Mat> &ims, vector<vector<float> > &boxes)
@@ -565,9 +568,6 @@ namespace ObjZoneDetect
 
         bbreg(boxes,prob,reg,thresholds_[2]);
         nms(boxes,outer_nms_);
-
-        cout<<prob->num()<<"\t"<<prob->channels()<<"\t"<<prob->height()<<"\t"<<prob->width()<<endl;
-        cout<<reg->num()<<"\t"<<reg->channels()<<"\t"<<reg->height()<<"\t"<<reg->width()<<endl;
     }
 
     void MTcnnDetector::Detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
@@ -586,19 +586,35 @@ namespace ObjZoneDetect
         bbreg(boxes);
 
         rerac(boxes);
+        vector<vector<float> > boxes_bak = boxes;
+        pad(boxes,im,dst_boxes);
+        generateRois(im_float,boxes,dst_boxes,im_rois);
+        boxes = boxes_bak;
+        rNet(im_rois,boxes);
+
+        rerac(boxes);
+        printBBox(boxes);
+        boxes_bak = boxes;
         pad(boxes,im,dst_boxes);
         printBBox(dst_boxes,boxes);
         generateRois(im_float,boxes,dst_boxes,im_rois);
-        rNet(im_rois,boxes);
+        boxes = boxes_bak;
+        oNet(im_rois,boxes);
 
-//        rerac(boxes);
-//        pad(boxes,im,dst_boxes);
-//        generateRois(im_float,boxes,dst_boxes,im_rois);
-//        oNet(im_rois,boxes);
-
-//        addRectangle(im_temp,boxes);
-//        imshow("im",im_temp);
-//        waitKey(0);
+        objs.clear();
+        for(int i=0; i<boxes.size(); ++i)
+        {
+            if(boxes[i][4]<confidence_threshold)
+                continue;
+            ObjZoneDetect::Object obj;
+            obj.zone.x = max(0,int(boxes[i][0]));
+            obj.zone.y = max(0,int(boxes[i][1]));
+            obj.zone.width = min(im.cols,int(boxes[i][2])) - obj.zone.x;
+            obj.zone.height = min(im.rows,int(boxes[i][3])) - obj.zone.y;
+            obj.cls = 0;
+            obj.score = boxes[i][4];
+            objs.push_back(obj);
+        }
     }
 
     void MTcnnDetector::addRectangle(cv::Mat &im, const vector<vector<float> > &bboxes)
