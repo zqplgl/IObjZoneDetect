@@ -25,7 +25,9 @@ namespace ObjZoneDetect
     };
 
 
-    IObjZoneDetect *CreateObjZoneYoloV3Detector(const std::string& cfg_file, const std::string& weights_file,const int gpu_id);
-    IObjZoneDetect *CreateObjZoneMTcnnDetector(const vector<string>& prototxts_file, const vector<string>& weights_file,const int gpu_id);
+    IObjZoneDetect *CreateObjZoneYoloV3Detector(const std::string& cfg_file, const std::string& weights_file,const int gpu_id=0);
+    IObjZoneDetect *CreateObjZoneMTcnnDetector(const vector<string>& prototxts_file, const vector<string>& weights_file,const int gpu_id=0);
+    IObjZoneDetect *CreateObjZoneSSDDetector(const string &deploy_file, const string& weights_file,
+                                             const vector<float>& mean_values,const float normal_val, const int gpu_id=0);
 }
 #endif

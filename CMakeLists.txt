@@ -18,19 +18,20 @@ if(USE_CUDNN)
 endif()
 
 include_directories(/usr/local/cuda/include)
-include_directories(/home/zqp/install_lib/include)
+#include_directories(/home/zqp/install_lib/include)
 include_directories(./include)
 include_directories(/usr/include)
 
 find_library(boostsystem_lib boost_system /usr/lib/x86_64-linux-gnu)
 find_library(darknet_lib darknet /home/zqp/install_lib/lib)
-find_library(caffe_lib caffe /home/zqp/install_lib/lib)
+find_library(caffe_lib caffe)
 message( STATUS "boost: " ${boostsystem_lib})
 message( STATUS "boost: " ${caffe_lib})
 message( STATUS "boost: " ${darknet_lib})
 
-find_package(OpenCV 3.2)
-add_library(IObjZoneDetect SHARED ${src})
+find_package(OpenCV 3.4)
+#add_library(IObjZoneDetect SHARED ${src})
+add_library(IObjZoneDetect SHARED ${PROJECT_SOURCE_DIR}/src/ObjZoneDetectSSD.cpp)
 target_link_libraries(IObjZoneDetect ${darknet_lib} ${OpenCV_LIBS} ${caffe_lib} ${boostsystem_lib})
 
 

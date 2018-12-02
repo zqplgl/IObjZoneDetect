@@ -43,7 +43,7 @@ void getImPath(string& picDir,vector<string>&imPath)
     }
 }
 
-IObjZoneDetect* create_mtcnn_detector()
+IObjZoneDetect* createMtcnnDetector()
 {
     vector<string> prototxt_files = {"/home/zqp/install_lib/models/mtcnn/det1.prototxt",
                                      "/home/zqp/install_lib/models/mtcnn/det2.prototxt",
@@ -54,29 +54,42 @@ IObjZoneDetect* create_mtcnn_detector()
                                      "/home/zqp/install_lib/models/mtcnn/det3.caffemodel",
     };
 
-    IObjZoneDetect *detector = CreateObjZoneMTcnnDetector(prototxt_files,weights_file,0);
+//    IObjZoneDetect *detector = CreateObjZoneMTcnnDetector(prototxt_files,weights_file,0);
 
-    return detector;
+    return NULL;
 
 }
 
-IObjZoneDetect* create_yolov3_detector()
+IObjZoneDetect* createYolov3Detector()
 {
     string cfg_file ="/home/zqp/install_lib/models/yolov3/yolov3.cfg";
     string weights_file = "/home/zqp/install_lib/models/yolov3/yolov3.weights";
 
     int gpu_id = 0;
-    IObjZoneDetect *detector = CreateObjZoneYoloV3Detector(cfg_file,weights_file,gpu_id);
+//    IObjZoneDetect *detector = CreateObjZoneYoloV3Detector(cfg_file,weights_file,gpu_id);
 
-    return detector;
+    return NULL;
+}
+
+IObjZoneDetect* createSSDDetector()
+{
+    string deploy_file = "/home/zqp/install_lib/models/plate/detector/deploy.prototxt";
+    string weights_file = "/home/zqp/install_lib/models/plate/detector/MobileNetSSD_deploy_iter_48000.caffemodel";
+    vector<float> mean_values = {0.5,0.5,0.5};
+    float normal_val = 0.007843;
+
+    IObjZoneDetect *detetor = CreateObjZoneSSDDetector(deploy_file,weights_file,mean_values,normal_val,0);
+    return detetor;
+
 }
 
 void run_pic()
 {
-    string picDir = "/home/zqp/github/mtcnn-master/";
+    string picDir = "/home/zqp/testimage/";
 
     //IObjZoneDetect *detector = create_yolov3_detector();
-    IObjZoneDetect *detector = create_mtcnn_detector();
+//    IObjZoneDetect *detector = create_mtcnn_detector();
+    IObjZoneDetect *detector = createSSDDetector();
 
     vector<string> imPath;
     getImPath(picDir,imPath);
@@ -101,7 +114,7 @@ void run_pic()
         cv::Mat im = cv::imread(file);
 
         start = clock();
-        detector->Detect(im,objs,0.5);
+        detector->Detect(im,objs,0.7);
         end = clock();
         cout<<"detect cost time: "<<(double(end-start)/CLOCKS_PER_SEC)*1000<<" ms"<<endl;
         cout<<"objs: "<<objs.size()<<endl;
@@ -114,7 +127,7 @@ void run_pic()
 
 void run_video()
 {
-    IObjZoneDetect *detector = create_yolov3_detector();
+    IObjZoneDetect *detector = createSSDDetector();
 
     string videopath = "/home/zqp/video/test.mp4";
     VideoCapture cap(videopath);
@@ -131,8 +144,8 @@ void run_video()
         cout<<"**********detect cost time: "<<(double(end-start)/CLOCKS_PER_SEC)*1000<<" ms"<<endl;
         cout<<"objs: "<<objs.size()<<endl;
         addRectangle(im,objs);
-        imshow("im",im);
-        waitKey(1);
+//        imshow("im",im);
+//        waitKey(1);
   }
 }
 
