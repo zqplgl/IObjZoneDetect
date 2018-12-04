@@ -16,7 +16,7 @@ namespace ObjZoneDetect
     {
     public:
         SSDDetector(const string& deploy_file, const string& weight_file, const vector<float>& mean_values, const float normal_val = 1,const int gpu_id=0);
-        virtual void Detect(const cv::Mat& im, vector<Object> &objs, const float confidence_threshold);
+        virtual void detect(const cv::Mat& im, vector<Object> &objs, const float confidence_threshold);
 
     private:
         void setMean(const vector<float>& mean_values);
@@ -82,7 +82,7 @@ namespace ObjZoneDetect
            mean_ = channels[0];
    }
 
-   void SSDDetector::Detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
+   void SSDDetector::detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
    {
         objs.clear();
        cv::Mat im_normalized = imConvert(im);

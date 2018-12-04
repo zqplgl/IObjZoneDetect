@@ -114,14 +114,15 @@ void run_pic()
         cv::Mat im = cv::imread(file);
 
         start = clock();
-        detector->Detect(im,objs,0.7);
+        detector->detect(im,objs,0.7);
         end = clock();
         cout<<"detect cost time: "<<(double(end-start)/CLOCKS_PER_SEC)*1000<<" ms"<<endl;
         cout<<"objs: "<<objs.size()<<endl;
         addRectangle(im,objs);
         index += 1;
         imshow("im",im);
-        waitKey(0);
+        if(waitKey(0)==27)
+            break;
   }
 }
 
@@ -139,7 +140,7 @@ void run_video()
     while(cap.read(im))
     {
         start = clock();
-        detector->Detect(im,objs,0.5);
+        detector->detect(im,objs,0.5);
         end = clock();
         cout<<"**********detect cost time: "<<(double(end-start)/CLOCKS_PER_SEC)*1000<<" ms"<<endl;
         cout<<"objs: "<<objs.size()<<endl;

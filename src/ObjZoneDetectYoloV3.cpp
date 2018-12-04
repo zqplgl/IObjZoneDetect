@@ -39,7 +39,7 @@ namespace ObjZoneDetect
     {
     public:
         YoloV3Detector(const string& cfg_file, const string& weights_file,const int gpu_id);
-        virtual void Detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold);
+        virtual void detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold);
         ~YoloV3Detector();
 
     private:
@@ -99,7 +99,7 @@ namespace ObjZoneDetect
 
         return r;
     }
-    void YoloV3Detector::Detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold)
+    void YoloV3Detector::detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold)
     {
         Mat im_resize;
         cv::resize(img,im_resize,Size(net->w,net->h));

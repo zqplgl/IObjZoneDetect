@@ -20,7 +20,7 @@ namespace ObjZoneDetect
     class IObjZoneDetect
     {
         public:
-            virtual void Detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold)=0;
+            virtual void detect(const cv::Mat& img, vector<Object> &objs, const float confidence_threshold)=0;
             virtual ~IObjZoneDetect(){}
     };
 

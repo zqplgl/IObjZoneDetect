@@ -13,7 +13,7 @@ namespace ObjZoneDetect
     {
     public:
         MTcnnDetector(const vector<string>& prototxt_files, const vector<string>& weights_file,const int gpu_id);
-        virtual void Detect(const cv::Mat& im, vector<Object> &objs, const float confidence_threshold);
+        virtual void detect(const cv::Mat& im, vector<Object> &objs, const float confidence_threshold);
 
     private:
         cv::Mat imConvert(const cv::Mat& im);
@@ -570,7 +570,7 @@ namespace ObjZoneDetect
         nms(boxes,outer_nms_);
     }
 
-    void MTcnnDetector::Detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
+    void MTcnnDetector::detect(const cv::Mat &im, vector<ObjZoneDetect::Object> &objs, const float confidence_threshold)
     {
         cv::Mat im_temp = im.clone();
         cv::Mat im_float = imConvert(im);
