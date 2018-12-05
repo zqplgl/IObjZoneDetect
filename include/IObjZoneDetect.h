@@ -15,6 +15,7 @@ namespace ObjZoneDetect
         cv::Rect zone;
         float score;
         int cls;
+
     };
 
     class IObjZoneDetect
