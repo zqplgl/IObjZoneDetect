@@ -15,7 +15,14 @@ namespace ObjZoneDetect
         cv::Rect zone;
         float score;
         int cls;
-
+        bool operator ==(Object const& t) const
+        {
+            return this->zone==t.zone && this->cls==t.cls;
+        }
+        bool operator !=(Object const& t) const
+        {
+            return this->zone!=t.zone && this->cls!=t.cls;
+        }
     };
 
     class IObjZoneDetect

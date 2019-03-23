@@ -62,13 +62,14 @@ IObjZoneDetect* createMtcnnDetector()
 
 IObjZoneDetect* createYolov3Detector()
 {
-    string cfg_file ="/home/zqp/install_lib/models/yolov3/yolov3.cfg";
-    string weights_file = "/home/zqp/install_lib/models/yolov3/yolov3.weights";
+    string cfg_file ="/home/zqp/models/cartwheel/yolo_v3vehicle.cfg";
+    string weights_file = "/home/zqp/models/cartwheel/yolo_v3vehicle_15000.weights";
 
     int gpu_id = 0;
-//    IObjZoneDetect *detector = CreateObjZoneYoloV3Detector(cfg_file,weights_file,gpu_id);
+    IObjZoneDetect *detector =NULL;
+    detector = CreateObjZoneYoloV3Detector(cfg_file,weights_file,gpu_id);
 
-    return NULL;
+    return detector;
 }
 
 IObjZoneDetect* createSSDDetector()
@@ -85,11 +86,11 @@ IObjZoneDetect* createSSDDetector()
 
 void run_pic()
 {
-    string picDir = "/home/zqp/testimage/";
+    string picDir = "/home/zqp/testpic/cartwheel/";
 
     //IObjZoneDetect *detector = create_yolov3_detector();
 //    IObjZoneDetect *detector = create_mtcnn_detector();
-    IObjZoneDetect *detector = createSSDDetector();
+    IObjZoneDetect *detector = createYolov3Detector();
 
     vector<string> imPath;
     getImPath(picDir,imPath);
@@ -114,7 +115,7 @@ void run_pic()
         cv::Mat im = cv::imread(file);
 
         start = clock();
-        detector->detect(im,objs,0.7);
+        detector->detect(im,objs,0.1);
         end = clock();
         cout<<"detect cost time: "<<(double(end-start)/CLOCKS_PER_SEC)*1000<<" ms"<<endl;
         cout<<"objs: "<<objs.size()<<endl;
