@@ -34,6 +34,19 @@ class ICartwheelZoneDetect:
 
         return result,boxes
 
+class IPatentCharZoneDetect:
+    def __init__(self,model_dir, gpu_id=0):
+        if not model_dir.endswith("/"):
+            model_dir += "/"
+        cfg_file = model_dir + "patent/yolov3patent.cfg"
+        weight_file = model_dir + "patent/yolov3patent.weights"
+        self.__detector = IObjZoneYOLOV3Detect(cfg_file,weight_file,gpu_id)
+
+    def detect(self, im, confidence_threshold=0.7):
+        boxes = self.__detector.detect(im,confidence_threshold)
+
+        return boxes
+
 def addRectangle(im,boxes):
     font = cv2.FONT_HERSHEY_SIMPLEX
     for box in boxes:
@@ -42,15 +55,15 @@ def addRectangle(im,boxes):
         cv2.putText(im, "%s:%.2f"%(box["cls"],box["score"]),(zone[0],zone[1]),font,1,(0,255,0))
 
 def run():
-    cfg_file = "/home/zqp/models/cartwheel/yolo_v3vehicle.cfg"
-    weight_file = "/home/zqp/models/cartwheel/yolo_v3vehicle_15000.weights"
+    cfg_file = "/home/zqp/models/patent/yolov3patent.cfg"
+    weight_file = "/home/zqp/models/patent/yolov3patent.weights"
     model_dir = "/home/zqp/models/"
-    detector = ICartwheelZoneDetect(model_dir)
+    detector = IPatentCharZoneDetect(model_dir)
 
-    picdir = "/home/zqp/testpic/cartwheel/"
+    picdir = "/media/zqp/data/data/patent/VOCdevkit/VOC2007/JPEGImages/"
     for picname in os.listdir(picdir):
         im = cv2.imread(picdir+picname)
-        result,boxes = detector.detect(im)
+        boxes = detector.detect(im)
         addRectangle(im, boxes)
         cv2.imshow("im", im)
         if cv2.waitKey(0)==27:

@@ -137,6 +137,12 @@ namespace ObjZoneDetect
             obj.zone.width = (b.x+b.w/2.)*img.cols - obj.zone.x;
             obj.zone.height = (b.y+b.h/2.)*img.rows - obj.zone.y;
 
+            if(obj.zone.x<0) obj.zone.x = 0;
+            if(obj.zone.y<0) obj.zone.y = 0;
+            if(obj.zone.x+obj.zone.width>=img.cols) obj.zone.width = img.cols - obj.zone.x;
+            if(obj.zone.y+obj.zone.height>=img.rows) obj.zone.height = img.rows - obj.zone.y;
+
+
             obj.score = score;
 
             objs.push_back(obj);
